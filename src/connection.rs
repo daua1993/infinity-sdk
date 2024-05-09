@@ -5,6 +5,7 @@ use futures::{SinkExt, StreamExt};
 use serde_json::json;
 use tokio::io::WriteHalf;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio_util::codec::{FramedRead, FramedWrite};
 
@@ -17,11 +18,12 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new() -> Self {
-        Connection {
+    pub fn new() -> anyhow::Result<Self> {
+        let conn = Connection {
             running: true,
             transport_tx: None,
-        }
+        };
+        Ok(conn)
     }
 
     fn set_transport_tx(&mut self, tx: Arc<Mutex<FramedWrite<WriteHalf<TcpStream>, AppCodec>>>) {
@@ -32,16 +34,13 @@ impl Connection {
         println!("Nhan duoc du lieu tai day: {:?}", data);
     }
 
-    pub async fn connect(&mut self) -> anyhow::Result<()> {
+    pub async fn connect(&mut self, sender: Sender<Data>) -> anyhow::Result<()> {
         loop {
             if !self.running {
                 break;
             }
-            // let mut receiver = receiver_from_worker.resubscribe();
-            // let mut sender = sender_to_worker.clone();
-            // match TcpStream::connect("localhost:9999").await {
             match TcpStream::connect("45.119.83.244:4444").await {
-                Ok(mut stream) => {
+                Ok(stream) => {
                     println!("Connected to the server");
 
                     let esl_codec = AppCodec {};
@@ -49,14 +48,13 @@ impl Connection {
 
                     let mut transport_rx = FramedRead::new(read_half, esl_codec.clone());
                     let transport_tx = Arc::new(Mutex::new(FramedWrite::new(write_half, esl_codec.clone())));
-                    // let transport_tx = FramedWrite::new(write_half, esl_codec.clone());
                     self.set_transport_tx(transport_tx.clone());
 
                     // Creating a dynamic JSON object
                     let user = json!({
                         "requestId": "1",
-                        "username": "stringee",
-                        "password": "abc@1234",
+                        "username": "username",
+                        "password": "password",
                         "module_name": "client",
                         "dc_id": "dc_id",
                         "ip": "127.0.0.1",
@@ -76,8 +74,7 @@ impl Connection {
 
                     loop {
                         if let (Some(Ok(dt))) = transport_rx.next().await {
-                            println!("Received from server: {:?}", dt);
-                            self.on_data_received(dt.clone()).await;
+                            println!("Received from server: {:?}", dt.clone());
                             if dt.service == 1 {
                                 let ping = json!({
                                             "requestId": "1",
@@ -106,8 +103,8 @@ impl Connection {
                 }
             }
             println!("Reconnecting in 5 secs");
-            let secs_30 = Duration::from_secs(5);
-            tokio::time::sleep(secs_30).await;
+            let secs_5 = Duration::from_secs(5);
+            tokio::time::sleep(secs_5).await;
         }
         Ok(())
     }
