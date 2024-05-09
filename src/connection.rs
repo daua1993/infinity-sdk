@@ -32,6 +32,42 @@ impl Connection {
 
     async fn on_data_received(&mut self, data: Data) {
         println!("Nhan duoc du lieu tai day: {:?}", data);
+        if data.service == 1 {
+            let ping = json!({
+                "requestId": "1",
+                "hbc": "1",
+            });
+            let str = serde_json::to_string(&ping).unwrap();
+            let dt = Data {
+                service: 1,
+                data: str,
+            };
+            let v1 = dt.to_bytes().await;
+            let v2: &[u8] = &v1;
+
+            if let Some(tx) = &self.transport_tx {
+                let mut tx = tx.lock().await;
+                match tx.send(v2).await {
+                    Ok(_) => {
+                        println!("Gui du lieu toi server")
+                    }
+                    Err(err) => {
+                        println!("Loi gui du lieu toi server: {:?}", err)
+                    }
+                };
+                drop(tx);
+            }
+            // let mut tx = self.transport_tx.lock().await;
+            // match tx.send(v2).await {
+            //     Ok(_) => {
+            //         println!("Sent to the server")
+            //     }
+            //     Err(err) => {
+            //         println!("Error sending to the server: {:?}", err)
+            //     }
+            // };
+            // drop(tx);
+        }
     }
 
     pub async fn connect(&mut self, sender: Sender<Data>) -> anyhow::Result<()> {
@@ -47,7 +83,8 @@ impl Connection {
                     let (read_half, write_half) = tokio::io::split(stream);
 
                     let mut transport_rx = FramedRead::new(read_half, esl_codec.clone());
-                    let transport_tx = Arc::new(Mutex::new(FramedWrite::new(write_half, esl_codec.clone())));
+                    let transport_tx =
+                        Arc::new(Mutex::new(FramedWrite::new(write_half, esl_codec.clone())));
                     self.set_transport_tx(transport_tx.clone());
 
                     // Creating a dynamic JSON object
@@ -64,7 +101,10 @@ impl Connection {
                     // Serialize the JSON object to a string
                     let json_string = serde_json::to_string(&user).unwrap();
 
-                    let dt = Data { service: 2, data: json_string };
+                    let dt = Data {
+                        service: 2,
+                        data: json_string,
+                    };
                     let b1 = dt.to_bytes().await;
                     let b2: &[u8] = &b1;
 
@@ -75,22 +115,30 @@ impl Connection {
                     loop {
                         if let (Some(Ok(dt))) = transport_rx.next().await {
                             println!("Received from server: {:?}", dt.clone());
-                            if dt.service == 1 {
-                                let ping = json!({
-                                            "requestId": "1",
-                                            "hbc": "1",
-                                        });
-                                let str = serde_json::to_string(&ping).unwrap();
-                                let dt = Data { service: 1, data: str };
-                                let v1 = dt.to_bytes().await;
-                                let v2: &[u8] = &v1;
-                                let mut tx = transport_tx.lock().await;
-                                match tx.send(v2).await {
-                                    Ok(_) => { println!("Sent to the server") }
-                                    Err(err) => { println!("Error sending to the server: {:?}", err) }
-                                };
-                                drop(tx);
-                            }
+                            self.on_data_received(dt.clone()).await;
+                            // if dt.service == 1 {
+                            //     let ping = json!({
+                            //         "requestId": "1",
+                            //         "hbc": "1",
+                            //     });
+                            //     let str = serde_json::to_string(&ping).unwrap();
+                            //     let dt = Data {
+                            //         service: 1,
+                            //         data: str,
+                            //     };
+                            //     let v1 = dt.to_bytes().await;
+                            //     let v2: &[u8] = &v1;
+                            //     let mut tx = transport_tx.lock().await;
+                            //     match tx.send(v2).await {
+                            //         Ok(_) => {
+                            //             println!("Sent to the server")
+                            //         }
+                            //         Err(err) => {
+                            //             println!("Error sending to the server: {:?}", err)
+                            //         }
+                            //     };
+                            //     drop(tx);
+                            // }
                         } else {
                             println!("Error reading from the server");
                             break;
@@ -109,3 +157,4 @@ impl Connection {
         Ok(())
     }
 }
+
