@@ -39,7 +39,8 @@ impl Connection {
             }
             // let mut receiver = receiver_from_worker.resubscribe();
             // let mut sender = sender_to_worker.clone();
-            match TcpStream::connect("localhost:9999").await {
+            // match TcpStream::connect("localhost:9999").await {
+            match TcpStream::connect("45.119.83.244:4444").await {
                 Ok(mut stream) => {
                     println!("Connected to the server");
 
