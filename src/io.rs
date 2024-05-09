@@ -1,23 +1,23 @@
 use bytes::Buf;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::Data;
-use crate::error::EslError;
+use crate::data::Data;
+use crate::error::AppError;
 
 #[derive(Debug, Clone)]
-pub(crate) struct EslCodec {}
+pub(crate) struct AppCodec {}
 
-impl Encoder<&[u8]> for EslCodec {
-    type Error = EslError;
+impl Encoder<&[u8]> for AppCodec {
+    type Error = AppError;
     fn encode(&mut self, item: &[u8], dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
         dst.extend_from_slice(item);
         Ok(())
     }
 }
 
-impl Decoder for EslCodec {
+impl Decoder for AppCodec {
     type Item = Data;
-    type Error = EslError;
+    type Error = AppError;
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if src.len() < 6 {
             return Ok(None);
@@ -41,7 +41,7 @@ impl Decoder for EslCodec {
         match String::from_utf8(data) {
             Ok(string) => Ok(Some(Data { service, data: string })),
             Err(utf8_error) => {
-                Err(EslError::from(std::io::Error::new(
+                Err(AppError::from(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     utf8_error.utf8_error(),
                 )))
