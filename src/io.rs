@@ -11,7 +11,6 @@ impl Encoder<&[u8]> for EslCodec {
     type Error = EslError;
     fn encode(&mut self, item: &[u8], dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
         dst.extend_from_slice(item);
-        dst.extend_from_slice(b"\n\n");
         Ok(())
     }
 }
